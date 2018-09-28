@@ -50,6 +50,7 @@ public class TcpStorageServer implements Runnable, StorageServer, NaRPCService<T
 	private long keys;
 	private ConcurrentHashMap<Integer, ByteBuffer> dataBuffers;
 	private String dataDirPath;
+	private ByteBuffer dummyBuffer;
 	
 	@Override
 	public void init(CrailConfiguration conf, String[] args) throws Exception {
@@ -65,6 +66,7 @@ public class TcpStorageServer implements Runnable, StorageServer, NaRPCService<T
 		this.dataBuffers = new ConcurrentHashMap<Integer, ByteBuffer>();
 		this.dataDirPath = StorageUtils.getDatanodeDirectory(TcpStorageConstants.STORAGE_TCP_DATA_PATH, address);
 		StorageUtils.clean(TcpStorageConstants.STORAGE_TCP_DATA_PATH, dataDirPath);
+		this.dummyBuffer = ByteBuffer.allocateDirect((int) CrailConstants.BLOCK_SIZE);
 	}
 
 	@Override
@@ -103,7 +105,7 @@ public class TcpStorageServer implements Runnable, StorageServer, NaRPCService<T
 	@Override
 	public void run() {
 		try {
-			LOG.info("running TCP storage server, address " + address);
+			LOG.info("running TCP storage server vdebug, address " + address);
 			this.alive = true;
 			while(true){
 				NaRPCServerChannel endpoint = serverEndpoint.accept();
@@ -123,21 +125,22 @@ public class TcpStorageServer implements Runnable, StorageServer, NaRPCService<T
 	public TcpStorageResponse processRequest(TcpStorageRequest request) {
 		if (request.type() == TcpStorageProtocol.REQ_WRITE){
 			TcpStorageRequest.WriteRequest writeRequest = request.getWriteRequest();
-			ByteBuffer buffer = dataBuffers.get(writeRequest.getKey()).duplicate();
-			long offset = writeRequest.getAddress() - CrailUtils.getAddress(buffer);
-//			LOG.info("processing write request, key " + writeRequest.getKey() + ", address " + writeRequest.getAddress() + ", length " + writeRequest.length() + ", remaining " + writeRequest.getBuffer().remaining() + ", offset " + offset);
-			buffer.clear().position((int) offset);
-			buffer.put(writeRequest.getBuffer());
+//			ByteBuffer buffer = dataBuffers.get(writeRequest.getKey()).duplicate();
+//			long offset = writeRequest.getAddress() - CrailUtils.getAddress(buffer);
+//			buffer.clear().position((int) offset);
+//			buffer.put(writeRequest.getBuffer());
 			TcpStorageResponse.WriteResponse writeResponse = new TcpStorageResponse.WriteResponse(writeRequest.length());
 			return new TcpStorageResponse(writeResponse);
 		} else if (request.type() == TcpStorageProtocol.REQ_READ){
 			TcpStorageRequest.ReadRequest readRequest = request.getReadRequest();
-			ByteBuffer buffer = dataBuffers.get(readRequest.getKey()).duplicate();
-			long offset = readRequest.getAddress() - CrailUtils.getAddress(buffer);
-//			LOG.info("processing read request, address " + readRequest.getAddress() + ", length " + readRequest.length() + ", offset " + offset);
-			long limit = offset + readRequest.length();
-			buffer.clear().position((int) offset).limit((int) limit);
-			TcpStorageResponse.ReadResponse readResponse = new TcpStorageResponse.ReadResponse(buffer);
+//			ByteBuffer buffer = dataBuffers.get(readRequest.getKey()).duplicate();
+//			long offset = readRequest.getAddress() - CrailUtils.getAddress(buffer);
+//			long limit = offset + readRequest.length();
+//			buffer.clear().position((int) offset).limit((int) limit);
+
+			this.dummyBuffer.clear();
+			this.dummyBuffer.position(readRequest.length());
+			TcpStorageResponse.ReadResponse readResponse = new TcpStorageResponse.ReadResponse(dummyBuffer);
 			return new TcpStorageResponse(readResponse);
 		} else {
 			LOG.info("processing unknown request");
